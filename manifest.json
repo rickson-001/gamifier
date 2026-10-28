@@ -1,0 +1,27 @@
+{
+  "id": "./",
+  "name": "Quête — habitudes, tâches et objectifs",
+  "short_name": "Quête",
+  "description": "Suis tes habitudes, accomplis tes tâches et avance dans tes quêtes.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#16132e",
+  "theme_color": "#16132e",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
