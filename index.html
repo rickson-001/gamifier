@@ -236,9 +236,19 @@ input,select{font:inherit;color:inherit;background:none;border:none;outline:none
 #updBar button{background:var(--on2);color:var(--accent2);border-radius:99px;padding:7px 14px;font-weight:800;font-size:.78rem}
 
 /* célébration */
-#ov-level{align-items:center;justify-content:center;z-index:500;background:rgba(5,4,18,.78)}
+#ov-level,#ov-secret{align-items:center;justify-content:center;z-index:500;background:rgba(5,4,18,.78)}
 .cele{text-align:center;padding:30px 26px;width:84%;max-width:360px;background:var(--surface);border:3px solid var(--accent2);border-radius:30px;box-shadow:0 8px 0 var(--accent2-d);transform:scale(.7);transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
-#ov-level.open .cele{transform:none}
+#ov-level.open .cele,#ov-secret.open .cele{transform:none}
+#nav button{position:relative}
+.nbdg{position:absolute;top:0;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#ff4d6d;color:#fff;font-size:.66rem;font-weight:800;line-height:14px;text-align:center;border:2px solid var(--surface)}
+.nbdg[hidden]{display:none}
+.tr{position:relative}
+.tr .ntag{position:absolute;top:6px;right:6px;font-style:normal;font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:99px;background:#ff4d6d;color:#fff}
+#trBanner{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 10px);transform:translate(-50%,-160%);width:calc(100% - 28px);max-width:420px;z-index:600;display:flex;align-items:center;gap:12px;background:var(--surface);border:3px solid var(--accent2);border-radius:20px;box-shadow:0 5px 0 var(--accent2-d);padding:10px 14px;cursor:pointer;opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.3,1.4,.5,1),opacity .25s}
+#trBanner.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+#trBanner .e{font-size:1.9rem}
+#trBanner b{display:block;font-size:.92rem}
+#trBanner small{display:block;color:var(--text2);font-size:.74rem;font-weight:700}
 .cele .big{font-size:4.2rem;animation:bounce 1s infinite}
 @keyframes bounce{50%{transform:translateY(-8px) rotate(-4deg)}}
 .cele h2{font-family:var(--head);font-size:2rem;font-weight:700;color:var(--accent2);margin:6px 0 2px}
@@ -338,7 +348,7 @@ details.more summary{font-weight:800;font-size:.84rem;color:var(--text2);cursor:
     <button class="on" data-v="today" onclick="UI.go('today')"><span>🏠</span>Aujourd'hui</button>
     <button data-v="quests" onclick="UI.go('quests')"><span>🗺️</span>Quêtes</button>
     <button data-v="progress" onclick="UI.go('progress')"><span>📊</span>Progrès</button>
-    <button data-v="trophies" onclick="UI.go('trophies')"><span>🏆</span>Trophées</button>
+    <button data-v="trophies" onclick="UI.go('trophies')"><span>🏆</span>Trophées<b class="nbdg" id="trBadge" hidden></b></button>
   </nav>
 
   <div class="ov" id="ov-add"><div class="sheet"><div class="grab"></div><h2>Que veux-tu ajouter ?</h2><p class="sub">Chaque action accomplie te rapporte de l'XP.</p>
@@ -404,6 +414,8 @@ details.more summary{font-weight:800;font-size:.84rem;color:var(--text2);cursor:
 
   <div class="ov" id="ov-level"><div class="cele"><div class="big" id="lvE">🏆</div><h2 id="lvT">Niveau 2 !</h2><p id="lvS"></p><button class="btn" onclick="Sheets.close('ov-level')">Continuer</button></div></div>
 
+  <div class="ov" id="ov-secret"><div class="cele"><div class="big" id="scE">🤫</div><p style="margin:0">Trophée secret débloqué !</p><h2 id="scT"></h2><p id="scS"></p><button class="btn" onclick="Celebrate.openSecret()">Voir le trophée</button><button class="btn ghost" onclick="Sheets.close('ov-secret')">Continuer</button></div></div>
+  <div id="trBanner" role="status" aria-live="polite"></div>
   <canvas id="confetti"></canvas>
   <div id="updBar" role="status"><span>⬆️ Mise à jour disponible</span><button onclick="PWA.applyUpdate()">Mettre à jour</button></div>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -451,7 +463,7 @@ const DEF_DOMAINS = () => [
   { id: 'travail', name: 'Travail', emoji: '🎯', color: '#ff7a59' },
   { id: 'relations', name: 'Relations', emoji: '🤝', color: '#ff6fa8' }
 ];
-const fresh = () => ({ v: 1, name: '', domains: DEF_DOMAINS(), habits: [], tasks: [], quests: [], log: [], trophies: {}, settings: { mode: 'auto', palette: 'arcade', haptic: true, remind: true, custom: { light: null, dark: null } } });
+const fresh = () => ({ v: 1, name: '', domains: DEF_DOMAINS(), habits: [], tasks: [], quests: [], log: [], trophies: {}, trophiesSeen: {}, settings: { mode: 'auto', palette: 'arcade', haptic: true, remind: true, custom: { light: null, dark: null } } });
 let S = fresh();
 const SAFE_ID = /^[\w-]{1,64}$/, DATE_RE = /^\d{4}-\d{2}-\d{2}$/, HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const safeId = v => typeof v === 'string' && SAFE_ID.test(v);
@@ -464,6 +476,8 @@ const Store = {
     const arr = k => Array.isArray(o[k]) ? o[k] : [];
     const doms = arr('domains').filter(d => d && safeId(d.id)).map(d => ({ id: d.id, name: safeStr(d.name, 24) || 'Domaine', emoji: safeEmoji(d.emoji, '🎯'), color: HEX_RE.test(d.color) ? d.color : '#9ca3af' }));
     const st = { ...f, name: safeStr(o.name, 24), domains: doms.length ? doms : f.domains, trophies: (o.trophies && typeof o.trophies === 'object' && !Array.isArray(o.trophies)) ? Object.fromEntries(Object.entries(o.trophies).filter(([k, v]) => safeId(k) && Number.isFinite(v))) : {} };
+    const seenSrc = o.trophiesSeen && typeof o.trophiesSeen === 'object' && !Array.isArray(o.trophiesSeen) ? o.trophiesSeen : Object.fromEntries(Object.keys(st.trophies).map(k => [k, 1]));
+    st.trophiesSeen = Object.fromEntries(Object.entries(seenSrc).filter(([k, v]) => safeId(k) && v).map(([k]) => [k, 1]));
     const dom0 = st.domains[0].id, domOk = v => st.domains.some(d => d.id === v) ? v : dom0, num = (v, d) => Number.isFinite(v) ? v : d, today = todayStr();
     st.settings = { ...f.settings, ...(o.settings || {}), custom: { light: null, dark: null, ...((o.settings || {}).custom || {}) } };
     st.habits = arr('habits').filter(h => h && safeId(h.id)).map(h => ({ ...h, name: safeStr(h.name, 80), emoji: safeEmoji(h.emoji, '🎯'), domain: domOk(h.domain), diff: DIFF[h.diff] ? h.diff : 1, days: Array.isArray(h.days) && h.days.length ? h.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 6) : null, created: safeDate(h.created) || today, best: Math.max(0, num(h.best, 0)), archived: !!h.archived }));
@@ -672,7 +686,7 @@ const Sheets = {
 const Remind = { check() { if (!S.settings.remind || new Date().getHours() < 17) return; const t = todayStr(), n = G.todayHabits().filter(h => !G.isDone(h, t)).length; if (n) UI.toast(`🔔 Il te reste ${n} habitude${n > 1 ? 's' : ''} aujourd'hui`); } };
 const Act = {
   trophyDelta(before) { return Object.fromEntries(Object.entries(S.trophies).filter(([id]) => !before.has(id))); },
-  revokeTrophies(delta) { Object.entries(delta).forEach(([id, ts]) => { if (S.trophies[id] === ts) delete S.trophies[id]; }); },
+  revokeTrophies(delta) { Object.entries(delta).forEach(([id, ts]) => { if (S.trophies[id] === ts) { delete S.trophies[id]; delete S.trophiesSeen[id]; } }); },
   claim(kind, ev) {
     const before = G.snap(), t = todayStr();
     if (kind === 'day') {
@@ -698,7 +712,7 @@ const Act = {
     let big = false;
     if (now.lvl > before.lvl) { big = true; Celebrate.level(now.lvl); }
     S.domains.forEach(d => { if ((now.doms[d.id] || 1) > (before.doms[d.id] || 1) && !big) UI.toast(`${d.emoji} ${d.name} : niveau ${now.doms[d.id]} !`); });
-    if (fresh.length) setTimeout(() => { UI.toast('🏆 Trophée : ' + fresh.map(t => t.n).join(', ')); UI.confetti(60); UI.haptic(30); }, big ? 900 : 200);
+    if (fresh.length) setTimeout(() => Celebrate.trophies(fresh), big ? 900 : 200);
   },
   habit(id, ev) {
     const h = S.habits.find(x => x.id === id); if (!h) return; const day = todayStr(), before = G.snap();
@@ -768,7 +782,28 @@ const Act = {
   }
 };
 const Celebrate = {
-  level(l) { $('lvE').textContent = l >= 10 ? '💎' : l >= 5 ? '🌟' : '⭐'; $('lvT').textContent = 'Niveau ' + l + ' !'; $('lvS').textContent = 'Tu deviens ' + titleOf(l) + '. Continue comme ça !'; setTimeout(() => { Sheets.open('ov-level'); UI.confetti(150); UI.haptic(60); }, 350); }
+  level(l) { $('lvE').textContent = l >= 10 ? '💎' : l >= 5 ? '🌟' : '⭐'; $('lvT').textContent = 'Niveau ' + l + ' !'; $('lvS').textContent = 'Tu deviens ' + titleOf(l) + '. Continue comme ça !'; setTimeout(() => { Sheets.open('ov-level'); UI.confetti(150); UI.haptic(60); }, 350); },
+  bq: [], busy: false, _bt: null, secretId: null,
+  trophies(list) {
+    const pub = list.filter(t => !t.secret), sec = list.filter(t => t.secret);
+    if (pub.length > 2) this.bq.push({ e: '🏆', t: pub.length + ' trophées débloqués !', s: 'Touche pour les voir', go: () => UI.go('trophies') });
+    else pub.forEach(t => this.bq.push({ e: t.e, t: t.n, s: 'Trophée débloqué · touche pour voir', go: () => Forms.trophy(t.id) }));
+    this.next(); sec.forEach(t => this.secret(t));
+  },
+  next() {
+    if (this.busy || !this.bq.length) return;
+    const it = this.bq.shift(), b = $('trBanner'); this.busy = true;
+    b.innerHTML = `<div class="e">${it.e}</div><div><b>${esc(it.t)}</b><small>${esc(it.s)}</small></div>`;
+    const done = () => { clearTimeout(this._bt); b.classList.remove('show'); setTimeout(() => { this.busy = false; this.next(); }, 450); };
+    b.onclick = () => { done(); it.go(); };
+    b.classList.add('show'); UI.confetti(60); UI.haptic(30); this._bt = setTimeout(done, 4200);
+  },
+  secret(t, n = 0) {
+    if (document.querySelector('.ov.open')) { if (n < 40) setTimeout(() => this.secret(t, n + 1), 700); return; }
+    this.secretId = t.id; $('scE').textContent = t.e; $('scT').textContent = t.n; $('scS').textContent = t.d;
+    Sheets.open('ov-secret'); UI.confetti(150); UI.haptic(60);
+  },
+  openSecret() { Sheets.close('ov-secret'); if (this.secretId) Forms.trophy(this.secretId); }
 };
 
 /* ================= Rendu ================= */
@@ -818,7 +853,8 @@ const Render = {
     const now = new Date(t + 'T12:00:00'); now.setDate(1);
     return Array.from({ length: 12 }, (_, i) => { const d = new Date(now); d.setMonth(d.getMonth() + i - 11); const start = dayStr(d), next = new Date(d); next.setMonth(next.getMonth() + 1); const end = addDays(dayStr(next), -1); return { start, end, label: MONTHS[d.getMonth()].slice(0, 3), title: `${MONTHS[d.getMonth()]} ${d.getFullYear()}`, current: i === 11 }; });
   },
-  all() { this.head(); if (UI.view === 'today') this.today(); else if (UI.view === 'quests') this.quests(); else if (UI.view === 'progress') this.progress(); else this.trophies(); },
+  trBadge() { const n = TROPHIES.filter(t => S.trophies[t.id] && !S.trophiesSeen[t.id]).length, b = $('trBadge'); b.hidden = !n; b.textContent = n > 9 ? '9+' : n; },
+  all() { this.trBadge(); this.head(); if (UI.view === 'today') this.today(); else if (UI.view === 'quests') this.quests(); else if (UI.view === 'progress') this.progress(); else this.trophies(); },
   head() {
     const d = new Date(), h = d.getHours();
     $('greet').textContent = (h < 5 ? 'Bonne nuit' : h < 12 ? 'Bonjour' : h < 18 ? 'Salut' : 'Bonsoir') + (S.name ? ' ' + S.name : '') + ' !';
@@ -880,7 +916,7 @@ const Render = {
   trophies() {
     const st = G.stats(), f = this.trFilter, info = t => { const m = tMax(t, st), v = Math.min(m, t.val(st)); return { t, m, v, r: m ? v / m : 0, on: !!S.trophies[t.id] }; };
     const all = TROPHIES.map(info), n = all.filter(x => x.on).length; $('tSub').textContent = `${n} / ${all.length} débloqués`;
-    const card = x => x.t.secret && !x.on ? `<div class="tr secret" role="button" tabindex="0" onclick="Forms.trophy('${x.t.id}')"><div class="te">❓</div><b>???</b><small>🔒 Secret</small></div>` : `<div class="tr ${x.on ? 'on' : ''}" role="button" tabindex="0" onclick="Forms.trophy('${x.t.id}')"><div class="te">${x.t.e}</div><b>${esc(x.t.n)}</b>${x.on ? `<small>✓ ${fmtDM(dayStr(new Date(S.trophies[x.t.id])))}</small>` : `<div class="pbar"><i style="width:${x.r * 100}%"></i></div><small>${x.v} / ${x.m}</small>`}</div>`;
+    const card = x => x.t.secret && !x.on ? `<div class="tr secret" role="button" tabindex="0" onclick="Forms.trophy('${x.t.id}')"><div class="te">❓</div><b>???</b><small>🔒 Secret</small></div>` : `<div class="tr ${x.on ? 'on' : ''} ${x.on && !S.trophiesSeen[x.t.id] ? 'new' : ''}" role="button" tabindex="0" onclick="Forms.trophy('${x.t.id}')">${x.on && !S.trophiesSeen[x.t.id] ? '<i class="ntag">Nouveau</i>' : ''}<div class="te">${x.t.e}</div><b>${esc(x.t.n)}</b>${x.on ? `<small>✓ ${fmtDM(dayStr(new Date(S.trophies[x.t.id])))}</small>` : `<div class="pbar"><i style="width:${x.r * 100}%"></i></div><small>${x.v} / ${x.m}</small>`}</div>`;
     let h = `<div class="task-filters">${[['all', 'Tous', all.length], ['on', 'Débloqués', n], ['off', 'À débloquer', all.length - n]].map(([id, l, c]) => `<button class="task-filter ${f === id ? 'on' : ''}" onclick="Render.setTrFilter('${id}')">${l} · ${c}</button>`).join('')}</div>`;
     const next = all.filter(x => !x.on && !x.t.secret).sort((a, b) => b.r - a.r).slice(0, 3);
     if (f !== 'on' && next.length) h += `<div class="sh"><h3>Prochains trophées</h3></div>` + next.map(x => `<div class="trn" role="button" tabindex="0" onclick="Forms.trophy('${x.t.id}')"><div class="te">${x.t.e}</div><div class="bd"><b>${esc(x.t.n)}</b><div class="pbar"><i style="width:${x.r * 100}%"></i></div></div><span>${x.v} / ${x.m}</span></div>`).join('');
@@ -921,7 +957,7 @@ const Forms = {
     else S.habits.push({ id: uid(), name, emoji: f.emoji, domain: f.domain, diff: f.diff, days: f.days.length ? f.days : null, created: todayStr(), best: 0 });
     const b = G.snap(); G.reconcileDay(todayStr()); Store.save(); Sheets.close('ov-habit'); Render.all(); UI.toast(this.cur ? 'Habitude mise à jour' : '🔁 Habitude créée !'); this.cur = null; this.afterCreate(b);
   },
-  afterCreate() { const f = checkTrophies(); if (f.length) { Store.save(); Render.all(); setTimeout(() => { UI.toast('🏆 Trophée : ' + f.map(t => t.n).join(', ')); UI.confetti(60); }, 700); } },
+  afterCreate() { const f = checkTrophies(); if (f.length) { Store.save(); Render.all(); setTimeout(() => Celebrate.trophies(f), 700); } },
   /* tâche */
   task(id) {
     const t = S.tasks.find(x => x.id === id); this.cur = t ? id : null;
@@ -966,6 +1002,7 @@ const Forms = {
   addStep() { this.f.name = $('qName').value; this.f.steps.push({ id: uid(), t: '', d: false }); this.drawQuest(); const l = $('qSteps').querySelectorAll('input'); if (l.length) l[l.length - 1].focus(); },
   trophy(id) {
     const t = TROPHIES.find(x => x.id === id); if (!t) return;
+    if (S.trophies[id] && !S.trophiesSeen[id]) { S.trophiesSeen[id] = 1; Store.save(); Render.all(); }
     const st = G.stats(), m = tMax(t, st), v = Math.min(m, t.val(st)), ts = S.trophies[id], on = !!ts, pct = m ? Math.round(v / m * 100) : 0;
     if (t.secret && !on) { $('trBody').innerHTML = `<div class="grab"></div><div style="text-align:center"><div class="trbig">❓</div><h2 style="margin:6px 0 2px">Trophée secret</h2><p class="sub" style="margin:0 0 4px">${esc(t.c)}</p><p style="font-weight:700;font-style:italic;margin:10px 0 6px">« ${esc(t.h)} »</p><p class="sub" style="margin:0 0 16px">Il se dévoilera une fois débloqué.</p></div><button class="btn ghost" onclick="Sheets.close('ov-tr')">Fermer</button>`; Sheets.open('ov-tr'); return; }
     $('trBody').innerHTML = `<div class="grab"></div><div style="text-align:center"><div class="trbig ${on ? 'on' : ''}">${t.e}</div><h2 style="margin:6px 0 2px">${esc(t.n)}</h2><p class="sub" style="margin:0 0 4px">${esc(t.c)}${t.secret ? ' · 🤫 Secret' : ''}</p><p style="font-weight:700;margin:10px 0 16px">${esc(t.d)}</p></div>`
@@ -1174,7 +1211,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) { try
 
 /* ================= Démarrage ================= */
 Store.load(); try { G.compact(); } catch (_) {}
-try { const fr = checkTrophies(); if (fr.length) { Store.save(); setTimeout(() => { UI.toast('🏆 Trophée : ' + fr.map(t => t.n).join(', ')); UI.confetti(60); UI.haptic(30); }, 900); } } catch (_) {}
+try { const fr = checkTrophies(); if (fr.length) { Store.save(); setTimeout(() => Celebrate.trophies(fr), 900); } } catch (_) {}
 Theme.apply(); Render.all(); FileSync.init(); PWA.init(); Back.guard(); setTimeout(() => Remind.check(), 1600);
 </script>
 </body>
