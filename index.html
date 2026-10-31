@@ -93,6 +93,9 @@ input,select{font:inherit;color:inherit;background:none;border:none;outline:none
 
 /* quêtes */
 .q{background:var(--surface);border:2px solid var(--border);box-shadow:0 3px 0 var(--border);border-radius:22px;padding:15px;margin-bottom:12px;width:100%;text-align:left;display:block}
+textarea.field{font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit}
+#tName{height:auto;min-height:54px;padding:15px 16px;line-height:1.3;resize:none;overflow:hidden;display:block}
+.tnote{margin-top:5px;font-size:.76rem;font-weight:700;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .q{cursor:pointer}
 .q-next{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:2px dashed var(--border);font-size:.84rem;font-weight:800;color:var(--text2)}
 .q-next .chk{width:32px;height:32px;font-size:.95rem}
@@ -369,11 +372,12 @@ details.more summary{font-weight:800;font-size:.84rem;color:var(--text2);cursor:
     <button class="btn danger" id="hDel" onclick="Forms.del('habit')">Supprimer</button></div></div>
 
   <div class="ov" id="ov-task"><div class="sheet"><div class="grab"></div><h2 id="tTitle">Nouvelle tâche</h2><p class="sub">Une fois faite, elle te rapporte de l'XP.</p>
-    <input class="field" id="tName" placeholder="Ex. Appeler le médecin" maxlength="80" autocomplete="off"/>
+    <textarea class="field" id="tName" rows="1" placeholder="Ex. Appeler le médecin" maxlength="300" autocomplete="off" oninput="autoGrow(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"></textarea>
     <div class="sec">Domaine</div><div class="row" id="tDom"></div>
     <div class="sec">Difficulté</div><div class="seg" id="tDiff"></div>
     <div class="sec">Pour quand ?</div><div class="row" id="tWhen"></div>
     <input class="field" type="date" id="tDue" style="margin-top:10px"/>
+    <details class="qnote" id="tNoteBox"><summary>📝 Note (facultatif)</summary><textarea class="field" id="tNote" maxlength="500" rows="3" placeholder="Une idée, un lien, du contexte…"></textarea></details>
     <button class="btn" onclick="Forms.saveTask()">Enregistrer</button>
     <button class="btn danger" id="tDel" onclick="Forms.del('task')">Supprimer</button></div></div>
 
@@ -437,6 +441,7 @@ const EMOJIS = ['💪', '🏃', '📚', '🧘', '💧', '😴', '🥗', '🙏', 
 const DOM_COLORS = ['#34c58a', '#5aa2ff', '#ffc233', '#ff7a59', '#ff6fa8', '#a78bfa', '#2dd4d4', '#9ca3af'];
 const QSIZE = { 1: { l: 'Petite', step: 10, bonus: 30 }, 2: { l: 'Moyenne', step: 15, bonus: 60 }, 3: { l: 'Grande', step: 20, bonus: 100 }, 4: { l: 'Épique', step: 30, bonus: 150 } };
 const qSize = q => QSIZE[q && q.size] || QSIZE[2];
+const autoGrow = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
 const linkify = t => esc(t).replace(/https?:\/\/[^\s<]+/g, m => { const tail = (m.match(/(?:&quot;|&#39;|&gt;|[.,;:!?)])+$/) || [''])[0], u = m.slice(0, m.length - tail.length); return `<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>${tail}`; });
 const qDueTag = q => {
   if (!q.due) return '';
@@ -481,7 +486,7 @@ const Store = {
     const dom0 = st.domains[0].id, domOk = v => st.domains.some(d => d.id === v) ? v : dom0, num = (v, d) => Number.isFinite(v) ? v : d, today = todayStr();
     st.settings = { ...f.settings, ...(o.settings || {}), custom: { light: null, dark: null, ...((o.settings || {}).custom || {}) } };
     st.habits = arr('habits').filter(h => h && safeId(h.id)).map(h => ({ ...h, name: safeStr(h.name, 80), emoji: safeEmoji(h.emoji, '🎯'), domain: domOk(h.domain), diff: DIFF[h.diff] ? h.diff : 1, days: Array.isArray(h.days) && h.days.length ? h.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 6) : null, created: safeDate(h.created) || today, best: Math.max(0, num(h.best, 0)), archived: !!h.archived }));
-    st.tasks = arr('tasks').filter(t => t && safeId(t.id)).map(t => ({ ...t, title: safeStr(t.title != null ? t.title : t.name, 80), domain: domOk(t.domain), diff: DIFF[t.diff] ? t.diff : 1, due: safeDate(t.due), doneAt: num(t.doneAt, null) }));
+    st.tasks = arr('tasks').filter(t => t && safeId(t.id)).map(t => ({ ...t, title: safeStr(t.title != null ? t.title : t.name, 300), note: safeStr(t.note, 500), domain: domOk(t.domain), diff: DIFF[t.diff] ? t.diff : 1, due: safeDate(t.due), doneAt: num(t.doneAt, null) }));
     st.quests = arr('quests').filter(q => q && safeId(q.id)).map(q => ({ ...q, size: QSIZE[q.size] ? q.size : 2, start: safeDate(q.start), note: safeStr(q.note, 500), title: safeStr(q.title, 80), emoji: safeEmoji(q.emoji, '🗺️'), domain: domOk(q.domain), due: safeDate(q.due), doneAt: num(q.doneAt, null), steps: Array.isArray(q.steps) ? q.steps.filter(x => x && safeId(x.id)).map(x => ({ ...x, t: safeStr(x.t, 80), d: !!x.d })) : [] }));
     st.log = arr('log').filter(e => e && safeId(e.id) && typeof e.xp === 'number' && Number.isFinite(e.xp) && typeof e.day === 'string' && DATE_RE.test(e.day)).map(e => ({ ...e, kind: safeStr(e.kind, 20), sub: e.sub == null ? null : safeStr(e.sub, 64), ref: e.ref == null ? null : safeStr(e.ref, 64), dom: e.dom == null ? null : safeStr(e.dom, 64), ts: num(e.ts, 0) }));
     return st;
@@ -808,7 +813,7 @@ const Celebrate = {
 
 /* ================= Rendu ================= */
 const Render = {
-  taskFilter: 'today', trFilter: 'all', chartMode: 'days',
+  taskFilter: 'today', trFilter: 'all', chartMode: 'days', habDoneOpen: false,
   setTrFilter(k) { this.trFilter = k; this.trophies(); },
   setTaskFilter(mode) { this.taskFilter = mode; this.today(); },
   setChartMode(mode) { this.chartMode = mode; this.progress(); },
@@ -863,7 +868,7 @@ const Render = {
   domTag(id) { const d = G.dom(id); return `<span class="dtag" style="--c:${d.color}">${d.emoji} ${esc(d.name)}</span>`; },
   item(kind, o, done, extra, acts) {
     const fn = kind === 'habit' ? `Act.habit('${o.id}',event)` : `Act.task('${o.id}',event)`;
-    return `<div class="it ${done ? 'done' : ''}" data-item-kind="${kind}" data-item-id="${o.id}" title="Appui long pour modifier"><button class="chk" onclick="${fn}" aria-label="${done ? 'Annuler' : 'Terminer'}">✓</button><div class="bd"><div class="nm">${o.emoji ? o.emoji + ' ' : ''}${esc(o.name || o.title)}</div><div class="mt">${this.domTag(o.domain)}${extra || ''}</div></div><span class="xp">+${DIFF[o.diff].xp}</span>${acts || ''}</div>`;
+    return `<div class="it ${done ? 'done' : ''}" data-item-kind="${kind}" data-item-id="${o.id}" title="Appui long pour modifier"><button class="chk" onclick="${fn}" aria-label="${done ? 'Annuler' : 'Terminer'}">✓</button><div class="bd"><div class="nm">${o.emoji ? o.emoji + ' ' : ''}${esc(o.name || o.title)}</div><div class="mt">${this.domTag(o.domain)}${extra || ''}</div>${o.note ? `<div class="tnote">📝 ${esc(o.note)}</div>` : ''}</div><span class="xp">+${DIFF[o.diff].xp}</span>${acts || ''}</div>`;
   },
   today() {
     const total = G.total(), L = levelInfo(total), t = todayStr(), hs = G.todayHabits(), hd = hs.filter(h => G.isDone(h, t)).length;
@@ -880,8 +885,11 @@ const Render = {
       h = `<div class="empty"><div class="em">🎮</div>Ton aventure commence ici !<br>Ajoute ta première habitude, tâche ou quête avec le bouton <b>+</b>.<br><button class="btn sm" style="margin-top:14px" onclick="Forms.samples()">Commencer avec des exemples</button></div>`;
     } else {
       h += this.weekly(); h += `<div class="sh"><h3>Habitudes du jour</h3><span>${hd}/${hs.length}</span></div>`;
-      h += hs.length ? hs.map(x => { const streak = G.habitStreak(x), grace = G.habitGraceUsed(x); return this.item('habit', x, G.isDone(x, t), `${streak ? `<span>🔥 ${streak} j</span>` : ''}<span title="Jours de tolérance utilisés ce mois">🛟 ${grace}/3 utilisés</span>`); }).join('') : `<div class="empty">Aucune habitude prévue aujourd'hui.</div>`;
+      const habRow = x => { const streak = G.habitStreak(x), grace = G.habitGraceUsed(x); return this.item('habit', x, G.isDone(x, t), `${streak ? `<span>🔥 ${streak} j</span>` : ''}<span title="Jours de tolérance utilisés ce mois">🛟 ${grace}/3 utilisés</span>`); };
+      const habTodo = hs.filter(x => !G.isDone(x, t)), habDone = hs.filter(x => G.isDone(x, t));
+      h += !hs.length ? `<div class="empty">Aucune habitude prévue aujourd'hui.</div>` : habTodo.length ? habTodo.map(habRow).join('') : `<div class="empty">Toutes tes habitudes du jour sont faites 🎉</div>`;
       if (G.dayPending(t)) h += `<div class="claim"><div><b>✨ Journée parfaite !</b><small>Toutes tes habitudes sont faites · à récupérer avant minuit</small></div><button class="btn sm gold" onclick="Act.claim('day',event)">🎁 +${DAY_BONUS} XP</button></div>`;
+      if (habDone.length) h += `<details class="task-done" ${this.habDoneOpen ? 'open' : ''} ontoggle="Render.habDoneOpen=this.open"><summary>✅ Terminées aujourd’hui · ${habDone.length}</summary>${habDone.map(habRow).join('')}</details>`;
       h += this.taskSection();
       const aq = activeQuests().slice(0, 2);
       if (aq.length) h += `<div class="sh" style="margin-top:20px"><h3>Quêtes en cours</h3><span onclick="UI.go('quests')" style="cursor:pointer">Tout voir →</span></div>` + aq.map(q => this.quest(q)).join('');
@@ -962,7 +970,7 @@ const Forms = {
   task(id) {
     const t = S.tasks.find(x => x.id === id); this.cur = t ? id : null;
     this.f = t ? { name: t.title, domain: t.domain, diff: t.diff, due: t.due || '' } : { name: '', domain: S.domains[0].id, diff: 1, due: todayStr() };
-    $('tTitle').textContent = t ? 'Modifier la tâche' : 'Nouvelle tâche'; $('tName').value = this.f.name; $('tDel').style.display = t ? '' : 'none'; this.drawTask(); Sheets.close('ov-add'); Sheets.open('ov-task');
+    $('tTitle').textContent = t ? 'Modifier la tâche' : 'Nouvelle tâche'; $('tName').value = this.f.name; $('tNote').value = t ? t.note || '' : ''; $('tNoteBox').open = !!(t && t.note); $('tDel').style.display = t ? '' : 'none'; this.drawTask(); Sheets.close('ov-add'); Sheets.open('ov-task'); autoGrow($('tName')); requestAnimationFrame(() => autoGrow($('tName')));
   },
   drawTask() {
     const f = this.f; this.chipsDom('tDom', f.domain, 'Forms.tSet.bind(null,&quot;domain&quot;)'); this.segDiff('tDiff', f.diff, 'Forms.tSet.bind(null,&quot;diff&quot;)');
@@ -982,9 +990,9 @@ const Forms = {
     task.due = addDays(todayStr(), 1); Store.save(); Render.all(); UI.toast('Tâche reportée à demain');
   },
   saveTask() {
-    const name = $('tName').value.trim(); if (!name) { UI.toast('Donne un nom à ta tâche'); return; } const f = this.f, due = $('tDue').value || null;
-    if (this.cur) { const t = S.tasks.find(x => x.id === this.cur); Object.assign(t, { title: name, domain: f.domain, diff: f.diff, due }); }
-    else S.tasks.push({ id: uid(), title: name, domain: f.domain, diff: f.diff, due, doneAt: null });
+    const name = $('tName').value.replace(/\s*\n+\s*/g, ' ').trim().slice(0, 300); if (!name) { UI.toast('Donne un nom à ta tâche'); return; } const f = this.f, due = $('tDue').value || null, note = $('tNote').value.trim().slice(0, 500);
+    if (this.cur) { const t = S.tasks.find(x => x.id === this.cur); Object.assign(t, { title: name, domain: f.domain, diff: f.diff, due, note }); }
+    else S.tasks.push({ id: uid(), title: name, domain: f.domain, diff: f.diff, due, note, doneAt: null });
     Store.save(); Sheets.close('ov-task'); Render.all(); UI.toast(this.cur ? 'Tâche mise à jour' : '✅ Tâche ajoutée'); this.cur = null;
   },
   /* quête */
