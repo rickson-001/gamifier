@@ -549,7 +549,7 @@ const G = {
     return Math.min(3, n);
   },
   weekly() { const t = todayStr(), ws = addDays(t, -((wd(t) + 6) % 7)), goal = Math.max(10, S.habits.length * 5 + 3); return { ws, goal, n: S.log.reduce((a, e) => a + (e.day >= ws && ['habit', 'task', 'step'].includes(e.kind) ? 1 : 0), 0) }; },
-  compact() { const lim = addDays(todayStr(), -365), keep = [], agg = {}; S.log.forEach(e => { if (e.day < lim && e.kind !== 'habit' && e.kind !== 'archive') { const k = e.day.slice(0, 7) + '|' + e.dom, a = agg[k] || (agg[k] = { id: uid(), day: e.day.slice(0, 7) + '-01', ts: 0, kind: 'archive', sub: null, ref: null, xp: 0, dom: e.dom, n: 0 }); a.xp += e.xp; if (e.kind === 'task' || e.kind === 'step') a.n++; } else keep.push(e); }); if (Object.keys(agg).length) S.log = [...keep, ...Object.values(agg)]; },
+  compact() { const lim = addDays(todayStr(), -365), keep = [], agg = {}; S.log.forEach(e => { if (e.day < lim && e.kind !== 'habit' && e.kind !== 'archive' && e.kind !== 'task') { const k = e.day.slice(0, 7) + '|' + e.dom, a = agg[k] || (agg[k] = { id: uid(), day: e.day.slice(0, 7) + '-01', ts: 0, kind: 'archive', sub: null, ref: null, xp: 0, dom: e.dom, n: 0 }); a.xp += e.xp; if (e.kind === 'task' || e.kind === 'step') a.n++; } else keep.push(e); }); if (Object.keys(agg).length) S.log = [...keep, ...Object.values(agg)]; },
   globalStreak() {
     const days = new Set(S.log.filter(e => e.kind !== 'bonus').map(e => e.day)); let d = todayStr(), n = 0;
     if (!days.has(d)) d = addDays(d, -1);
@@ -1186,10 +1186,14 @@ const PWA = (() => {
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {}
     if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
     try {
-      _reg = await navigator.serviceWorker.register('sw.js', { scope: './' }); navigator.serviceWorker.ready.then(render); navigator.serviceWorker.addEventListener('controllerchange', render);
+      _reg = await navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' }); navigator.serviceWorker.ready.then(render); navigator.serviceWorker.addEventListener('controllerchange', render);
       const watch = w => w && w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) $('updBar').classList.add('show'); });
       if (_reg.waiting && navigator.serviceWorker.controller) $('updBar').classList.add('show');
       _reg.addEventListener('updatefound', () => watch(_reg.installing));
+      const checkUpdate = () => { if (document.visibilityState === 'visible') _reg.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', checkUpdate);
+      addEventListener('focus', checkUpdate);
+      setTimeout(checkUpdate, 2500);
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (_updating) location.reload(); });
     } catch (e) { console.warn('[PWA]', e); }
   }
