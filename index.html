@@ -825,25 +825,35 @@ const Render = {
     const unscheduled = S.tasks.filter(x => !x.doneAt && !x.due);
     const doneAll = S.tasks.filter(x => x.doneAt).sort((a, b) => b.doneAt - a.doneAt);
     const doneToday = doneAll.filter(x => dayStr(new Date(x.doneAt)) === t);
-    const recentFrom = addDays(t, -6), doneRecent = doneAll.filter(x => dayStr(new Date(x.doneAt)) >= recentFrom);
-    const doneRow = x => { const d = dayStr(new Date(x.doneAt)); return this.item('task', x, true, `<span>✅ ${d.slice(8)}/${d.slice(5, 7)}</span>`); };
+    const doneGroups = () => {
+      const groups = new Map();
+      doneAll.forEach(x => { const day = dayStr(new Date(x.doneAt)); if (!groups.has(day)) groups.set(day, []); groups.get(day).push(x); });
+      return [...groups.entries()].map(([day, items]) => {
+        const d = new Date(day + 'T12:00:00');
+        const label = day === t ? "Aujourd’hui" : day === addDays(t, -1) ? 'Hier' : d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        return `<div class="sh" style="margin-top:14px"><h3>${esc(label)}</h3><span>${items.length}</span></div>` + items.map(x => {
+          const date = dayStr(new Date(x.doneAt));
+          return this.item('task', x, true, `<span>✅ ${date.slice(8)}/${date.slice(5, 7)}/${date.slice(0, 4)}</span>`, `<div class="it-acts"><button class="it-act primary" onclick="event.stopPropagation();Act.task('${x.id}',event)">↩ Rouvrir</button><button class="it-act" onclick="event.stopPropagation();Forms.task('${x.id}')">✏️ Modifier</button><button class="it-act" onclick="event.stopPropagation();Forms.del('task','${x.id}')">🗑 Supprimer</button></div>`);
+        }).join('');
+      }).join('');
+    };
     const activeCount = dueNow.length + later.length + unscheduled.length;
-    const filters = [['today', 'Aujourd’hui', dueNow.length], ['upcoming', 'À venir', later.length], ['unscheduled', 'À planifier', unscheduled.length], ['done', 'Terminées', doneRecent.length], ['all', 'Tout', activeCount + doneRecent.length]];
-    let h = `<div class="sh" style="margin-top:20px"><h3>Tâches</h3><span>${activeCount} à faire · ${doneRecent.length} terminée${doneRecent.length === 1 ? '' : 's'}</span></div>`;
+    const filters = [['today', 'Aujourd’hui', dueNow.length], ['upcoming', 'À venir', later.length], ['unscheduled', 'À planifier', unscheduled.length], ['done', 'Terminées', doneAll.length], ['all', 'Tout', activeCount + doneAll.length]];
+    let h = `<div class="sh" style="margin-top:20px"><h3>Tâches</h3><span>${activeCount} à faire · ${doneAll.length} terminée${doneAll.length === 1 ? '' : 's'}</span></div>`;
     h += `<div class="task-filters">${filters.map(([id, label, count]) => `<button class="task-filter ${this.taskFilter === id ? 'on' : ''}" onclick="Render.setTaskFilter('${id}')">${label} · ${count}</button>`).join('')}</div>`;
     const row = x => this.item('task', x, false, x.due && x.due < t ? `<span style="color:var(--red)">En retard · ${x.due.slice(8)}/${x.due.slice(5, 7)}</span>` : x.due ? `<span>📅 ${x.due.slice(8)}/${x.due.slice(5, 7)}</span>` : '<span>Sans échéance</span>', x.due && x.due < t ? `<div class="it-acts"><button class="it-act primary" onclick="event.stopPropagation();Forms.rescheduleToday('${x.id}')">Aujourd’hui</button><button class="it-act" onclick="event.stopPropagation();Forms.rescheduleTomorrow('${x.id}')">Demain</button><button class="it-act" onclick="event.stopPropagation();Forms.task('${x.id}')">📅 Date</button></div>` : '');
     const group = (title, items, emptyText) => `<div class="sh" style="margin-top:12px"><h3>${title}</h3><span>${items.length}</span></div>${items.length ? items.map(row).join('') : `<div class="empty">${emptyText}</div>`}`;
     if (this.taskFilter === 'today') h += group('À faire aujourd’hui', dueNow, 'Rien à faire aujourd’hui. Profites-en ! 😌') + (doneToday.length ? `<details class="task-done"><summary>✅ Terminées aujourd’hui · ${doneToday.length}</summary>${doneToday.map(x => this.item('task', x, true)).join('')}</details>` : '');
     else if (this.taskFilter === 'upcoming') h += group('À venir', later, 'Aucune tâche à venir.');
     else if (this.taskFilter === 'unscheduled') h += group('À planifier', unscheduled, 'Aucune tâche sans échéance.');
-    else if (this.taskFilter === 'done') h += `<div class="sh" style="margin-top:12px"><h3>Terminées · 7 derniers jours</h3><span>${doneRecent.length}</span></div>${doneRecent.length ? doneRecent.map(doneRow).join('') : '<div class="empty">Aucune tâche terminée ces 7 derniers jours.</div>'}`;
+    else if (this.taskFilter === 'done') h += doneAll.length ? doneGroups() : '<div class="empty">Aucune tâche terminée pour le moment.</div>';
     else {
-      if (!activeCount && !doneRecent.length) h += `<div class="empty">Aucune tâche pour le moment.</div>`;
+      if (!activeCount && !doneAll.length) h += `<div class="empty">Aucune tâche pour le moment.</div>`;
       else {
         h += group('À faire aujourd’hui', dueNow, 'Rien à faire aujourd’hui.');
         if (later.length) h += group('À venir', later, '');
         if (unscheduled.length) h += group('À planifier', unscheduled, '');
-        if (doneRecent.length) h += `<details class="task-done"><summary>✅ Terminées · 7 derniers jours · ${doneRecent.length}</summary>${doneRecent.map(doneRow).join('')}</details>`;
+        if (doneAll.length) h += `<details class="task-done"><summary>✅ Toutes les tâches terminées · ${doneAll.length}</summary>${doneGroups()}</details>`;
       }
     }
     return h;
