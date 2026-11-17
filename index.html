@@ -539,14 +539,14 @@ const G = {
   habitStreak(h) {
     const done = this.doneDays(h); let d = todayStr(), n = 0;
     if (this.scheduled(h, d) && !done.has(d)) d = addDays(d, -1);
-    const jok = new Map(), t0 = todayStr();
-    for (let i = 0; i < 4000 && d >= h.created; i++) { if (this.scheduled(h, d)) { if (done.has(d)) n++; else { const m = d.slice(0, 7), missed = jok.get(m) || 0; if (d < t0 && missed < 3) jok.set(m, missed + 1); else break; } } d = addDays(d, -1); }
+    for (let i = 0; i < 4000 && d >= h.created; i++) {
+      if (this.scheduled(h, d)) {
+        if (done.has(d)) n++;
+        else break;
+      }
+      d = addDays(d, -1);
+    }
     return n;
-  },
-  habitGraceUsed(h) {
-    const today = todayStr(), start = today.slice(0, 7) + '-01'; let n = 0;
-    for (let d = start; d < today; d = addDays(d, 1)) if (this.scheduled(h, d) && !this.isDone(h, d)) n++;
-    return Math.min(3, n);
   },
   weekly() { const t = todayStr(), ws = addDays(t, -((wd(t) + 6) % 7)), goal = Math.max(10, S.habits.length * 5 + 3); return { ws, goal, n: S.log.reduce((a, e) => a + (e.day >= ws && ['habit', 'task', 'step'].includes(e.kind) ? 1 : 0), 0) }; },
   compact() { const lim = addDays(todayStr(), -365), keep = [], agg = {}; S.log.forEach(e => { if (e.day < lim && e.kind !== 'habit' && e.kind !== 'archive') { const k = e.day.slice(0, 7) + '|' + e.dom, a = agg[k] || (agg[k] = { id: uid(), day: e.day.slice(0, 7) + '-01', ts: 0, kind: 'archive', sub: null, ref: null, xp: 0, dom: e.dom, n: 0 }); a.xp += e.xp; if (e.kind === 'task' || e.kind === 'step') a.n++; } else keep.push(e); }); if (Object.keys(agg).length) S.log = [...keep, ...Object.values(agg)]; },
@@ -885,7 +885,7 @@ const Render = {
       h = `<div class="empty"><div class="em">🎮</div>Ton aventure commence ici !<br>Ajoute ta première habitude, tâche ou quête avec le bouton <b>+</b>.<br><button class="btn sm" style="margin-top:14px" onclick="Forms.samples()">Commencer avec des exemples</button></div>`;
     } else {
       h += this.weekly(); h += `<div class="sh"><h3>Habitudes du jour</h3><span>${hd}/${hs.length}</span></div>`;
-      const habRow = x => { const streak = G.habitStreak(x), grace = G.habitGraceUsed(x); return this.item('habit', x, G.isDone(x, t), `${streak ? `<span>🔥 ${streak} j</span>` : ''}<span title="Jours de tolérance utilisés ce mois">🛟 ${grace}/3 utilisés</span>`); };
+      const habRow = x => { const streak = G.habitStreak(x); return this.item('habit', x, G.isDone(x, t), streak ? `<span>🔥 ${streak} j</span>` : ''); };
       const habTodo = hs.filter(x => !G.isDone(x, t)), habDone = hs.filter(x => G.isDone(x, t));
       h += !hs.length ? `<div class="empty">Aucune habitude prévue aujourd'hui.</div>` : habTodo.length ? habTodo.map(habRow).join('') : `<div class="empty">Toutes tes habitudes du jour sont faites 🎉</div>`;
       if (G.dayPending(t)) h += `<div class="claim"><div><b>✨ Journée parfaite !</b><small>Toutes tes habitudes sont faites · à récupérer avant minuit</small></div><button class="btn sm gold" onclick="Act.claim('day',event)">🎁 +${DAY_BONUS} XP</button></div>`;
