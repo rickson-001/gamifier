@@ -1165,6 +1165,13 @@ const ItemGestures = (() => {
   return {};
 })();
 
+document.addEventListener('click', e => {
+  const currentMenu = e.target.closest('.habit-more');
+  document.querySelectorAll('.habit-more[open]').forEach(menu => {
+    if (menu !== currentMenu) menu.open = false;
+  });
+}, true);
+
 /* ================= Sauvegarde fichier ================= */
 const FileSync = (() => {
   let _handle = null, _timer = null, _last = null, _status = 'idle';
