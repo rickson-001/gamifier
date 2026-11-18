@@ -139,7 +139,7 @@ textarea.field{font-family:inherit;font-size:inherit;font-weight:inherit;color:i
 .cb i{display:block;width:100%;border-radius:8px 8px 4px 4px;background:var(--accent);min-height:4px;transition:height .5s}
 .cb.t i{background:var(--accent2)}
 .cb em{font-style:normal;color:var(--text2)}
-.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.kp{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px}
 .kp div{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:12px 6px;text-align:center}
 .kp b{display:block;font-family:var(--head);font-size:1.3rem;font-weight:600}
 .kp span{font-size:.64rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
@@ -313,7 +313,7 @@ textarea.field{font-family:inherit;font-size:inherit;font-weight:inherit;color:i
 .claim b{display:block;font-family:var(--head);font-weight:600}
 .claim small{display:block;margin-top:2px;font-size:.74rem;font-weight:700;color:var(--text2)}
 @keyframes claimPop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
-.habit-history-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.habit-history-stats{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 12px}
 .habit-history-stats>div{min-width:0;padding:10px 11px;border-radius:13px;background:var(--surface);border:1px solid var(--border)}
 .habit-history-stats small{display:block;color:var(--text3);font-size:.68rem;font-weight:800}
 .habit-history-stats b{display:block;margin-top:4px;font-family:var(--head);font-size:1.05rem;font-weight:700}
@@ -947,7 +947,7 @@ const Render = {
       h = `<div class="empty"><div class="em">🎮</div>Ton aventure commence ici !<br>Ajoute ta première habitude, tâche ou quête avec le bouton <b>+</b>.<br><button class="btn sm" style="margin-top:14px" onclick="Forms.samples()">Commencer avec des exemples</button></div>`;
     } else {
       h += this.weekly(); h += `<div class="sh"><h3>Habitudes du jour</h3><span>${hd}/${hs.length}</span></div>`;
-      const habRow = x => { const completed = G.habitCompletedDays(x), best = Math.max(0, x.best || 0); return this.item('habit', x, G.isDone(x, t), `<span>✅ ${completed} jour${completed > 1 ? 's' : ''}</span><span>🏅 Record : ${best} j</span>`, this.habitMenu(x)); };
+      const habRow = x => { const completed = G.habitCompletedDays(x); return this.item('habit', x, G.isDone(x, t), `<span>✅ ${completed} jour${completed > 1 ? 's' : ''}</span>`, this.habitMenu(x)); };
       const habTodo = hs.filter(x => !G.isDone(x, t)), habDone = hs.filter(x => G.isDone(x, t));
       h += !hs.length ? `<div class="empty">Aucune habitude prévue aujourd'hui.</div>` : habTodo.length ? habTodo.map(habRow).join('') : `<div class="empty">Toutes tes habitudes du jour sont faites 🎉</div>`;
       if (G.dayPending(t)) h += `<div class="claim"><div><b>✨ Journée parfaite !</b><small>Toutes tes habitudes sont faites · à récupérer avant minuit</small></div><button class="btn sm gold" onclick="Act.claim('day',event)">🎁 +${DAY_BONUS} XP</button></div>`;
@@ -981,7 +981,7 @@ const Render = {
   progress() {
     const periods = this.chartPeriods(), vals = periods.map(p => S.log.filter(e => e.day >= p.start && e.day <= p.end).reduce((a, e) => a + e.xp, 0)), mx = Math.max(20, ...vals), s = G.stats();
     const titles = { days: 'XP des 7 derniers jours', weeks: 'XP des 12 dernières semaines', months: 'XP des 12 derniers mois' };
-    let h = `<div class="kp"><div><b>${s.comps}</b><span>Actions</span></div><div><b>${s.best}</b><span>Meilleure série</span></div><div><b>${s.questsDone}</b><span>Quêtes finies</span></div></div>`;
+    let h = `<div class="kp"><div><b>${s.comps}</b><span>Actions</span></div><div><b>${s.questsDone}</b><span>Quêtes finies</span></div></div>`;
     h += `<div class="sh"><h3>${titles[this.chartMode]}</h3><span>${vals.reduce((a, b) => a + b, 0)} XP</span></div><div class="chart-switch">${[['days', '7 jours'], ['weeks', '12 semaines'], ['months', '12 mois']].map(([id, label]) => `<button class="${this.chartMode === id ? 'on' : ''}" onclick="Render.setChartMode('${id}')">${label}</button>`).join('')}</div><div class="chart ${this.chartMode === 'days' ? '' : 'chart-many'}">${periods.map((p, i) => `<div class="cb ${p.current ? 't' : ''}" title="${p.title} · ${vals[i]} XP"><em>${vals[i] || ''}</em><i style="height:${Math.max(3, vals[i] / mx * 78)}%"></i>${p.label}</div>`).join('')}</div>`;
     h += `<div class="sh"><h3>Domaines</h3><span>Touche pour modifier</span></div><div class="grid2">` + S.domains.map(d => { const L = levelInfo(G.domXp(d.id)); return `<button class="dc" style="--c:${d.color}" onclick="Forms.dom('${d.id}')"><div class="de">${d.emoji}</div><div class="dn">${esc(d.name)}</div><div class="dl">Niveau ${L.lvl} · ${G.domXp(d.id)} XP</div><div class="pbar" style="margin:0"><i style="width:${Math.max(4, L.pct * 100)}%"></i></div></button>`; }).join('') + `<button class="dc add" onclick="Forms.dom()">+ Nouveau domaine</button></div>`;
     $('progBody').innerHTML = h;
@@ -1024,8 +1024,8 @@ const Forms = {
   heat(h) {
     const w = $('hMapWrap'); w.style.display = h ? '' : 'none';
     if (!h) { $('hHistoryStats').innerHTML = ''; return; }
-    const done = G.doneDays(h), total = G.habitCompletedDays(h), best = Math.max(0, h.best || 0);
-    $('hHistoryStats').innerHTML = `<div><small>Jours accomplis au total</small><b>✅ ${total}</b></div><div><small>Meilleure série consécutive</small><b>🏅 ${best} j</b></div>`;
+    const done = G.doneDays(h), total = G.habitCompletedDays(h);
+    $('hHistoryStats').innerHTML = `<div><small>Jours accomplis au total</small><b>✅ ${total}</b></div>`;
     const t = todayStr(), st = addDays(t, -((wd(t) + 6) % 7) - 98); let x = '';
     for (let i = 0; i < 105; i++) { const d = addDays(st, i); x += `<i class="${d > t ? 'f' : done.has(d) ? 'd' : G.scheduled(h, d) ? 'm' : ''}" title="${d}"></i>`; }
     $('hMap').innerHTML = x;
