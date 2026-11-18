@@ -1,5 +1,5 @@
 // Quête — cache hors ligne robuste
-const CACHE = 'quete-v11';
+const CACHE = 'quete-v12';
 const OPTIONAL_SHELL = ['manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', event => {
