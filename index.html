@@ -313,6 +313,10 @@ textarea.field{font-family:inherit;font-size:inherit;font-weight:inherit;color:i
 .claim b{display:block;font-family:var(--head);font-weight:600}
 .claim small{display:block;margin-top:2px;font-size:.74rem;font-weight:700;color:var(--text2)}
 @keyframes claimPop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
+.habit-history-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.habit-history-stats>div{min-width:0;padding:10px 11px;border-radius:13px;background:var(--surface);border:1px solid var(--border)}
+.habit-history-stats small{display:block;color:var(--text3);font-size:.68rem;font-weight:800}
+.habit-history-stats b{display:block;margin-top:4px;font-family:var(--head);font-size:1.05rem;font-weight:700}
 .hmap{display:grid;grid-template-rows:repeat(7,1fr);grid-auto-flow:column;gap:4px}
 .hmap i{aspect-ratio:1;border-radius:5px;background:var(--bg);border:1px solid var(--border)}
 .hmap i.d{background:var(--green);border-color:var(--green)}
@@ -377,7 +381,7 @@ details.more summary{font-weight:800;font-size:.84rem;color:var(--text2);cursor:
     <div class="sec">Domaine</div><div class="row" id="hDom"></div>
     <div class="sec">Difficulté</div><div class="seg" id="hDiff"></div>
     <div class="sec">Jours</div><div class="row" id="hDays"></div>
-    <div id="hMapWrap"><div class="sec">Régularité · 15 dernières semaines</div><div class="hmap" id="hMap"></div></div>
+    <div id="hMapWrap"><div class="habit-history-stats" id="hHistoryStats"></div><div class="sec">Régularité · 15 dernières semaines</div><div class="hmap" id="hMap"></div></div>
     <button class="btn" onclick="Forms.saveHabit()">Enregistrer</button>
     <button class="btn danger" id="hDel" onclick="Forms.del('habit')">Supprimer</button></div></div>
 
@@ -545,6 +549,7 @@ const G = {
   dom: id => S.domains.find(d => d.id === id) || S.domains[0],
   scheduled(h, day) { return !h.archived && day >= h.created && (!h.days || !h.days.length || h.days.includes(wd(day))); },
   doneDays(h) { return new Set(S.log.filter(e => e.kind === 'habit' && e.ref === h.id).map(e => e.day)); },
+  habitCompletedDays(h) { return this.doneDays(h).size; },
   isDone(h, day) { return S.log.some(e => e.kind === 'habit' && e.ref === h.id && e.day === day); },
   habitStreak(h) {
     const done = this.doneDays(h); let d = todayStr(), n = 0;
@@ -942,7 +947,7 @@ const Render = {
       h = `<div class="empty"><div class="em">🎮</div>Ton aventure commence ici !<br>Ajoute ta première habitude, tâche ou quête avec le bouton <b>+</b>.<br><button class="btn sm" style="margin-top:14px" onclick="Forms.samples()">Commencer avec des exemples</button></div>`;
     } else {
       h += this.weekly(); h += `<div class="sh"><h3>Habitudes du jour</h3><span>${hd}/${hs.length}</span></div>`;
-      const habRow = x => { const streak = G.habitStreak(x); return this.item('habit', x, G.isDone(x, t), streak ? `<span>🔥 ${streak} j</span>` : '', this.habitMenu(x)); };
+      const habRow = x => { const completed = G.habitCompletedDays(x), best = Math.max(0, x.best || 0); return this.item('habit', x, G.isDone(x, t), `<span>✅ ${completed} jour${completed > 1 ? 's' : ''}</span><span>🏅 Record : ${best} j</span>`, this.habitMenu(x)); };
       const habTodo = hs.filter(x => !G.isDone(x, t)), habDone = hs.filter(x => G.isDone(x, t));
       h += !hs.length ? `<div class="empty">Aucune habitude prévue aujourd'hui.</div>` : habTodo.length ? habTodo.map(habRow).join('') : `<div class="empty">Toutes tes habitudes du jour sont faites 🎉</div>`;
       if (G.dayPending(t)) h += `<div class="claim"><div><b>✨ Journée parfaite !</b><small>Toutes tes habitudes sont faites · à récupérer avant minuit</small></div><button class="btn sm gold" onclick="Act.claim('day',event)">🎁 +${DAY_BONUS} XP</button></div>`;
@@ -1016,7 +1021,15 @@ const Forms = {
     const f = this.f; this.chipsEmoji('hEmoji', f.emoji, 'Forms.hSet.bind(null,&quot;emoji&quot;)'); this.chipsDom('hDom', f.domain, 'Forms.hSet.bind(null,&quot;domain&quot;)'); this.segDiff('hDiff', f.diff, 'Forms.hSet.bind(null,&quot;diff&quot;)');
     $('hDays').innerHTML = `<button class="pick ${!f.days.length ? 'on' : ''}" onclick="Forms.hDay(-1)">Tous les jours</button>` + [1, 2, 3, 4, 5, 6, 0].map(d => `<button class="pick ${f.days.includes(d) ? 'on' : ''}" onclick="Forms.hDay(${d})">${DAYS_FULL[d].slice(0, 3)}</button>`).join('');
   },
-  heat(h) { const w = $('hMapWrap'); w.style.display = h ? '' : 'none'; if (!h) return; const done = G.doneDays(h), t = todayStr(), st = addDays(t, -((wd(t) + 6) % 7) - 98); let x = ''; for (let i = 0; i < 105; i++) { const d = addDays(st, i); x += `<i class="${d > t ? 'f' : done.has(d) ? 'd' : G.scheduled(h, d) ? 'm' : ''}" title="${d}"></i>`; } $('hMap').innerHTML = x; },
+  heat(h) {
+    const w = $('hMapWrap'); w.style.display = h ? '' : 'none';
+    if (!h) { $('hHistoryStats').innerHTML = ''; return; }
+    const done = G.doneDays(h), total = G.habitCompletedDays(h), best = Math.max(0, h.best || 0);
+    $('hHistoryStats').innerHTML = `<div><small>Jours accomplis au total</small><b>✅ ${total}</b></div><div><small>Meilleure série consécutive</small><b>🏅 ${best} j</b></div>`;
+    const t = todayStr(), st = addDays(t, -((wd(t) + 6) % 7) - 98); let x = '';
+    for (let i = 0; i < 105; i++) { const d = addDays(st, i); x += `<i class="${d > t ? 'f' : done.has(d) ? 'd' : G.scheduled(h, d) ? 'm' : ''}" title="${d}"></i>`; }
+    $('hMap').innerHTML = x;
+  },
   hSet(k, v) { Forms.f[k] = v; Forms.f.name = $('hName').value; Forms.drawHabit(); },
   hDay(d) { const f = this.f; f.name = $('hName').value; if (d === -1) f.days = []; else { const i = f.days.indexOf(d); if (i >= 0) f.days.splice(i, 1); else f.days.push(d); if (f.days.length === 7) f.days = []; } this.drawHabit(); },
   saveHabit() {
