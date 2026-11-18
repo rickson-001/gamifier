@@ -60,6 +60,13 @@ input,select{font:inherit;color:inherit;background:none;border:none;outline:none
 .it{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--border);box-shadow:0 3px 0 var(--border);border-radius:20px;padding:12px 14px 12px 12px;margin-bottom:11px;transition:opacity .2s}
 .it.done{opacity:.62}
 .it.done .nm{text-decoration:line-through}
+.habit-more{position:relative;flex:none;margin-left:auto;align-self:center}
+.habit-more summary{list-style:none;display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:1.25rem;font-weight:900;line-height:1;cursor:pointer}
+.habit-more summary::-webkit-details-marker{display:none}
+.habit-menu-pop{position:absolute;z-index:30;right:0;top:calc(100% + 7px);min-width:176px;padding:6px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.habit-menu-pop button,.habit-menu-pop span{display:block;width:100%;padding:10px 11px;border-radius:10px;text-align:left;font-size:.76rem;font-weight:800;color:var(--text)}
+.habit-menu-pop button:active{background:var(--accent);color:var(--on)}
+.habit-menu-pop span{color:var(--text3)}
 .chk{flex:none;width:38px;height:38px;border-radius:50%;border:3px solid var(--text3);display:grid;place-items:center;font-size:1.1rem;color:transparent;transition:all .18s;background:var(--bg)}
 .it.done .chk{background:var(--green);border-color:var(--green);color:#06281a;animation:pop .35s}
 .task-done{background:var(--surface);border:2px solid var(--border);border-radius:18px;padding:12px 14px;margin:14px 0 18px;color:var(--text2);font-size:.84rem;font-weight:800}
@@ -735,6 +742,47 @@ const Act = {
       this.habit(id); current.best = bestBefore; this.revokeTrophies(earned); G.reconcile(); Store.save(); Render.all(); return true;
     });
   },
+  habitYesterday(id, ev) {
+    const h = S.habits.find(x => x.id === id);
+    if (!h) return;
+    const day = addDays(todayStr(), -1);
+    if (!G.scheduled(h, day)) { UI.toast("Cette habitude n’était pas prévue hier"); return; }
+    if (G.isDone(h, day)) { UI.toast("Cette habitude est déjà validée pour hier"); return; }
+
+    const before = G.snap(), trophiesBefore = new Set(Object.keys(S.trophies)), bestBefore = h.best || 0;
+    const entry = { id: uid(), day, ts: Date.now(), kind: 'habit', sub: null, ref: id, xp: DIFF[h.diff].xp, dom: h.domain };
+    S.log.push(entry);
+
+    const streak = G.habitStreak(h);
+    h.best = Math.max(bestBefore, streak);
+    const bonusEntries = [];
+    Object.entries(STREAK_BONUS).forEach(([threshold, xp]) => {
+      const milestone = Number(threshold), sub = 'streak' + milestone;
+      if (streak >= milestone && bestBefore < milestone && !S.log.some(e => e.ref === id && e.sub === sub)) {
+        const bonus = { id: uid(), day, ts: Date.now(), kind: 'bonus', sub, ref: id, xp, dom: h.domain };
+        S.log.push(bonus);
+        bonusEntries.push(bonus);
+      }
+    });
+
+    G.reconcileDay(day);
+    UI.haptic();
+    this.after(before, ev);
+    const earned = this.trophyDelta(trophiesBefore);
+    UI.undoToast('Habitude validée pour hier', () => {
+      const current = S.habits.find(x => x.id === id);
+      if (!current || !S.log.some(e => e.id === entry.id)) return false;
+      const createdIds = new Set([entry.id, ...bonusEntries.map(x => x.id)]);
+      S.log = S.log.filter(e => !createdIds.has(e.id));
+      current.best = bestBefore;
+      this.revokeTrophies(earned);
+      G.reconcileDay(day);
+      G.reconcile();
+      Store.save();
+      Render.all();
+      return true;
+    });
+  },
   task(id, ev) {
     const t = S.tasks.find(x => x.id === id); if (!t) return; const before = G.snap();
     if (t.doneAt) { t.doneAt = null; S.log = S.log.filter(e => !(e.kind === 'task' && e.ref === id)); this.after(before, ev, true); return; }
@@ -866,9 +914,15 @@ const Render = {
     $('dateLbl').textContent = DAYS_FULL[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
   },
   domTag(id) { const d = G.dom(id); return `<span class="dtag" style="--c:${d.color}">${d.emoji} ${esc(d.name)}</span>`; },
-  item(kind, o, done, extra, acts) {
-    const fn = kind === 'habit' ? `Act.habit('${o.id}',event)` : `Act.task('${o.id}',event)`;
-    return `<div class="it ${done ? 'done' : ''}" data-item-kind="${kind}" data-item-id="${o.id}" title="Appui long pour modifier"><button class="chk" onclick="${fn}" aria-label="${done ? 'Annuler' : 'Terminer'}">✓</button><div class="bd"><div class="nm">${o.emoji ? o.emoji + ' ' : ''}${esc(o.name || o.title)}</div><div class="mt">${this.domTag(o.domain)}${extra || ''}</div>${o.note ? `<div class="tnote">📝 ${esc(o.note)}</div>` : ''}</div><span class="xp">+${DIFF[o.diff].xp}</span>${acts || ''}</div>`;
+  habitMenu(o) {
+    const yesterday = addDays(todayStr(), -1), planned = G.scheduled(o, yesterday), done = G.isDone(o, yesterday);
+    const action = !planned ? '<span>Pas prévue hier</span>' : done ? '<span>Déjà validée hier</span>' : `<button type="button" onclick="event.stopPropagation();this.closest('details').open=false;Act.habitYesterday('${o.id}',event)">↶ Valider pour hier</button>`;
+    return `<details class="habit-more"><summary aria-label="Options de l’habitude" title="Options">⋯</summary><div class="habit-menu-pop">${action}</div></details>`;
+  },
+  item(kind, o, done, extra, acts, checkFn, checkLabel) {
+    const fn = checkFn || (kind === 'habit' ? `Act.habit('${o.id}',event)` : `Act.task('${o.id}',event)`);
+    const label = checkLabel || (done ? 'Annuler' : 'Terminer');
+    return `<div class="it ${done ? 'done' : ''}" data-item-kind="${kind}" data-item-id="${o.id}" title="Appui long pour modifier"><button class="chk" onclick="${fn}" aria-label="${label}">✓</button><div class="bd"><div class="nm">${o.emoji ? o.emoji + ' ' : ''}${esc(o.name || o.title)}</div><div class="mt">${this.domTag(o.domain)}${extra || ''}</div>${o.note ? `<div class="tnote">📝 ${esc(o.note)}</div>` : ''}</div><span class="xp">+${DIFF[o.diff].xp}</span>${acts || ''}</div>`;
   },
   today() {
     const total = G.total(), L = levelInfo(total), t = todayStr(), hs = G.todayHabits(), hd = hs.filter(h => G.isDone(h, t)).length;
@@ -885,11 +939,14 @@ const Render = {
       h = `<div class="empty"><div class="em">🎮</div>Ton aventure commence ici !<br>Ajoute ta première habitude, tâche ou quête avec le bouton <b>+</b>.<br><button class="btn sm" style="margin-top:14px" onclick="Forms.samples()">Commencer avec des exemples</button></div>`;
     } else {
       h += this.weekly(); h += `<div class="sh"><h3>Habitudes du jour</h3><span>${hd}/${hs.length}</span></div>`;
-      const habRow = x => { const streak = G.habitStreak(x); return this.item('habit', x, G.isDone(x, t), streak ? `<span>🔥 ${streak} j</span>` : ''); };
+      const habRow = x => { const streak = G.habitStreak(x); return this.item('habit', x, G.isDone(x, t), streak ? `<span>🔥 ${streak} j</span>` : '', this.habitMenu(x)); };
       const habTodo = hs.filter(x => !G.isDone(x, t)), habDone = hs.filter(x => G.isDone(x, t));
       h += !hs.length ? `<div class="empty">Aucune habitude prévue aujourd'hui.</div>` : habTodo.length ? habTodo.map(habRow).join('') : `<div class="empty">Toutes tes habitudes du jour sont faites 🎉</div>`;
       if (G.dayPending(t)) h += `<div class="claim"><div><b>✨ Journée parfaite !</b><small>Toutes tes habitudes sont faites · à récupérer avant minuit</small></div><button class="btn sm gold" onclick="Act.claim('day',event)">🎁 +${DAY_BONUS} XP</button></div>`;
       if (habDone.length) h += `<details class="task-done" ${this.habDoneOpen ? 'open' : ''} ontoggle="Render.habDoneOpen=this.open"><summary>✅ Terminées aujourd’hui · ${habDone.length}</summary>${habDone.map(habRow).join('')}</details>`;
+      const yesterday = addDays(t, -1);
+      const missedYesterday = S.habits.filter(x => G.scheduled(x, yesterday) && !G.isDone(x, yesterday) && !G.scheduled(x, t));
+      if (missedYesterday.length) h += `<details class="task-done"><summary>↶ À rattraper depuis hier · ${missedYesterday.length}</summary>${missedYesterday.map(x => this.item('habit', x, false, `<span>À rattraper · ${fmtDM(yesterday)}</span>`, '', `Act.habitYesterday('${x.id}',event)`, 'Valider pour hier')).join('')}</details>`;
       h += this.taskSection();
       const aq = activeQuests().slice(0, 2);
       if (aq.length) h += `<div class="sh" style="margin-top:20px"><h3>Quêtes en cours</h3><span onclick="UI.go('quests')" style="cursor:pointer">Tout voir →</span></div>` + aq.map(q => this.quest(q)).join('');
@@ -1082,7 +1139,7 @@ const ItemGestures = (() => {
   const edit = (kind, id) => { if (kind === 'habit') Forms.habit(id); else Forms.task(id); };
   document.addEventListener('pointerdown', e => {
     const card = e.target.closest('.it[data-item-kind]');
-    if (!card || e.button !== 0 || e.target.closest('button')) return;
+    if (!card || e.button !== 0 || e.target.closest('button,.habit-more')) return;
     clear();
     active = { card, id: card.dataset.itemId, kind: card.dataset.itemKind, x: e.clientX, y: e.clientY, moved: false, long: false };
     timer = setTimeout(() => {
