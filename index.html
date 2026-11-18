@@ -730,7 +730,7 @@ const Act = {
     const h = S.habits.find(x => x.id === id); if (!h) return; const day = todayStr(), before = G.snap();
     if (G.isDone(h, day)) { S.log = S.log.filter(e => !(e.ref === id && e.day === day)); G.reconcileDay(day); this.after(before, ev, true); return; }
     const trophiesBefore = new Set(Object.keys(S.trophies)), bestBefore = h.best || 0;
-    const entry = { id: uid(), day, ts: new Date(day + 'T12:00:00').getTime(), kind: 'habit', sub: null, ref: id, xp: DIFF[h.diff].xp, dom: h.domain };
+    const entry = { id: uid(), day, ts: Date.now(), kind: 'habit', sub: null, ref: id, xp: DIFF[h.diff].xp, dom: h.domain };
     S.log.push(entry);
     const n = G.habitStreak(h); h.best = Math.max(h.best || 0, n);
     if (STREAK_BONUS[n] && !S.log.some(e => e.ref === id && e.sub === 'streak' + n)) { S.log.push({ id: uid(), day, ts: Date.now(), kind: 'bonus', sub: 'streak' + n, ref: id, xp: STREAK_BONUS[n], dom: h.domain }); UI.toast(`🔥 Série de ${n} jours ! +${STREAK_BONUS[n]} XP`); }
@@ -750,7 +750,7 @@ const Act = {
     if (G.isDone(h, day)) { UI.toast("Cette habitude est déjà validée pour hier"); return; }
 
     const before = G.snap(), trophiesBefore = new Set(Object.keys(S.trophies)), bestBefore = h.best || 0;
-    const entry = { id: uid(), day, ts: Date.now(), kind: 'habit', sub: null, ref: id, xp: DIFF[h.diff].xp, dom: h.domain };
+    const entry = { id: uid(), day, ts: new Date(day + 'T12:00:00').getTime(), kind: 'habit', sub: null, ref: id, xp: DIFF[h.diff].xp, dom: h.domain };
     S.log.push(entry);
 
     const streak = G.habitStreak(h);
