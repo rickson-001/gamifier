@@ -60,6 +60,9 @@ input,select{font:inherit;color:inherit;background:none;border:none;outline:none
 .it{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--border);box-shadow:0 3px 0 var(--border);border-radius:20px;padding:12px 14px 12px 12px;margin-bottom:11px;transition:opacity .2s}
 .it.done{opacity:.62}
 .it.done .nm{text-decoration:line-through}
+.it.menu-open{position:relative;z-index:100}
+.habit-more[open]{z-index:101}
+.habit-menu-pop{z-index:102}
 .habit-more{position:relative;flex:none;margin-left:auto;align-self:center}
 .habit-more summary{list-style:none;display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:1.25rem;font-weight:900;line-height:1;cursor:pointer}
 .habit-more summary::-webkit-details-marker{display:none}
@@ -917,7 +920,7 @@ const Render = {
   habitMenu(o) {
     const yesterday = addDays(todayStr(), -1), planned = G.scheduled(o, yesterday), done = G.isDone(o, yesterday);
     const action = !planned ? '<span>Pas prévue hier</span>' : done ? '<span>Déjà validée hier</span>' : `<button type="button" onclick="event.stopPropagation();this.closest('details').open=false;Act.habitYesterday('${o.id}',event)">↶ Valider pour hier</button>`;
-    return `<details class="habit-more"><summary aria-label="Options de l’habitude" title="Options">⋯</summary><div class="habit-menu-pop">${action}</div></details>`;
+    return `<details class="habit-more" ontoggle="this.closest('.it').classList.toggle('menu-open',this.open)"><summary aria-label="Options de l’habitude" title="Options">⋯</summary><div class="habit-menu-pop">${action}</div></details>`;
   },
   item(kind, o, done, extra, acts, checkFn, checkLabel) {
     const fn = checkFn || (kind === 'habit' ? `Act.habit('${o.id}',event)` : `Act.task('${o.id}',event)`);
